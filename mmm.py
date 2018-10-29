@@ -38,7 +38,7 @@ adwords_pivoted =  pd.pivot_table(adwords,
                                   #aggfunc=[np.sum]
                                   )
 
-data =pd.merge(left= pivot,
+data=pd.merge(left= pivot,
                right =  adwords_pivoted,
                on = ['year','weeknumber'],
                how='inner'
@@ -168,7 +168,7 @@ for mdl in models:
     print("{}, r2_score = {}".format(mdl['name'] , final_r_square))
 
 # train best model*
-#best_model = max(models, key=lambda mdl: mdl['score'])
+#model = max(models, key=lambda mdl: mdl['score'])
 import matplotlib.pyplot as plt
 grid_number_columns = 4    
 fig, axs = plt.subplots(int(len(models)/grid_number_columns),
@@ -179,15 +179,15 @@ fig, axs = plt.subplots(int(len(models)/grid_number_columns),
 colormap = plt.cm.gist_ncar #nipy_spectral, Set1,Paired   
 colors = [colormap(i) for i in np.linspace(0, 1,len(inv_columns))]
 
-for i,best_model in enumerate(models):
-    #best_model =  models[5]
+for i,model in enumerate(models):
+    #model =  models[5]
     #fit model
     # predict with diferent inversions
     labels = []
     # by default all models qualify 
     
-    best_model['qualify']=True 
-    best_model['mdl'].fit(x_matrix,y_vector)
+    model['qualify']=True 
+    model['mdl'].fit(x_matrix,y_vector)
     for col_ix,inv_col in enumerate(inv_columns):
         
         n_sample = 100
@@ -197,12 +197,12 @@ for i,best_model in enumerate(models):
                                         stop = 1500000, #data_sel_col[inv_col].max(), 
                                         num = n_sample)
         
-        predict['y_predicted_{}'.format(inv_col)]  =  best_model['mdl'].predict(predict[indep_vars].values)
+        predict['y_predicted_{}'.format(inv_col)]  =  model['mdl'].predict(predict[indep_vars].values)
         
         # qualify model 
         # based on the growth curve
         if not predict['y_predicted_{}'.format(inv_col)].is_monotonic:
-             best_model['qualify']=False   
+             model['qualify']=False   
         
         #sns.scatterplot(x=inv_col, y="y_predicted", data=predict)
      
@@ -221,8 +221,8 @@ for i,best_model in enumerate(models):
     #           columnspacing=1.0, labelspacing=0.0,
     #           handletextpad=0.0, handlelength=1.5,
     #           fancybox=True, shadow=True)
-    fig.axes[i].set_title('{} qualify={}'.format(best_model['name'],best_model['qualify'])  )
-    fig.axes[i].set_xlabel('r2_score = {0:.3f}'.format(best_model['score']))
+    fig.axes[i].set_title('{} qualify={}'.format(model['name'],model['qualify'])  )
+    fig.axes[i].set_xlabel('r2_score = {0:.3f}'.format(model['score']))
 fig.show()
 
 # ============================== # 
@@ -251,3 +251,26 @@ class AssembleModel():
 
 best_model = AssembleModel(models)
 best_model.predict(x_matrix)
+
+# export model 
+import dill
+with open("best_model.pkl", "wb") as dill_file:
+    dill.dump(best_model, dill_file)
+    
+
+# ======================================= # 
+# ========= optimization model ========== #
+# ======================================= #
+
+
+from pulp import LpProblem, LpMaximize
+
+# problem definition 
+prob = LpProblem("MMM",LpMaximize)
+
+
+for inv_var in inv_columns:
+LpVariable("example", upBound = 100)
+    
+    
+    
