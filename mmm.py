@@ -69,9 +69,10 @@ to_keep = inv_columns + keys + target
 corr_matrix = data.corr().abs()
 # Select upper triangle of correlation matrix
 upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-# Find features with correlation greater than 0.95
+# Find features with correlation greater than treshold 
+correlation_threshold=0.65
 to_drop = [column for column in upper.columns \
-           if any(upper[column] > 0.65) and \
+           if any(upper[column] > correlation_threshold) and \
            column not in to_keep] + ['total_orders']
 # Drop features 
 data_sel_col =  data[[col for col in data.columns if col not in to_drop]]
@@ -102,7 +103,7 @@ data_sel_col = data_sel_col.dropna(axis='rows')
 # a = data_sel_col[['year', 'weeknumber', 'total_paid']]\
 #                .sort_values('total_paid')
 
-# cyber
+# cyber weeks
 cyber = [(2018,21),
          (2017,22),
          (2016,22),
@@ -183,7 +184,9 @@ for i,best_model in enumerate(models):
     #fit model
     # predict with diferent inversions
     labels = []
+    # by default all models qualify 
     
+    best_model['qualify']=True 
     best_model['mdl'].fit(x_matrix,y_vector)
     for col_ix,inv_col in enumerate(inv_columns):
         
@@ -195,6 +198,11 @@ for i,best_model in enumerate(models):
                                         num = n_sample)
         
         predict['y_predicted_{}'.format(inv_col)]  =  best_model['mdl'].predict(predict[indep_vars].values)
+        
+        # qualify model 
+        # based on the growth curve
+        if not predict['y_predicted_{}'.format(inv_col)].is_monotonic:
+             best_model['qualify']=False   
         
         #sns.scatterplot(x=inv_col, y="y_predicted", data=predict)
      
@@ -213,6 +221,33 @@ for i,best_model in enumerate(models):
     #           columnspacing=1.0, labelspacing=0.0,
     #           handletextpad=0.0, handlelength=1.5,
     #           fancybox=True, shadow=True)
-    fig.axes[i].set_title(best_model['name'])
+    fig.axes[i].set_title('{} qualify={}'.format(best_model['name'],best_model['qualify'])  )
     fig.axes[i].set_xlabel('r2_score = {0:.3f}'.format(best_model['score']))
 fig.show()
+
+# ============================== # 
+# ===== model assembly  ======== # 
+# ============================== # 
+
+# Model assembly based on score performance and convexity conditions over the 
+# model curve
+class AssembleModel():
+    
+    def __init__(self, models):
+        selected_models = []
+        for mdl in models:
+            if mdl['qualify'] and mdl['score'] != np.nan:
+               selected_models.append(mdl)
+        self.selected_models = selected_models
+        
+    def predict(self, x):
+        # given an x ndarray return convex prediction based on score of all 
+        # qualified models 
+        
+        return sum([mdl['mdl'].predict(x) * mdl['score'] 
+                    for mdl in self.selected_models])\
+                /sum([mdl['score'] for mdl in self.selected_models])
+        
+
+best_model = AssembleModel(models)
+best_model.predict(x_matrix)

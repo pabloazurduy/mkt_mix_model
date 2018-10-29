@@ -7,4 +7,3 @@ an MVP for a MMM in a online store
  - matplotlib 
  - numpy
  - sklearn
-
