@@ -45,7 +45,7 @@ data=pd.merge(left= pivot,
                )
 # unnest column names 
 data.columns = [col for col in data.columns if type(col)==str] +  \
-                ['_'.join(tup).rstrip('_') for tup in data.columns.values if type(tup)==tuple] 
+                ['_'.join(tup).rstrip('_').replace(' ','') for tup in data.columns.values if type(tup)==tuple] 
 # facebook dataframe
 """
 facebook =  dfs['facebook_ads']
@@ -263,14 +263,17 @@ with open("best_model.pkl", "wb") as dill_file:
 # ======================================= #
 
 
-from pulp import LpProblem, LpMaximize
+from pulp import LpProblem, LpMaximize, LpVariable
 
 # problem definition 
 prob = LpProblem("MMM",LpMaximize)
-
-
+opt_vars = {}
+# matrix f(x)
 for inv_var in inv_columns:
-LpVariable("example", upBound = 100)
+    pass
+    #opt_vars[inv_var] = LpVariable(inv_var, lowBound = 0)
+
+#choices = LpVariable.dicts("Choice",(Vals,Rows,Cols),0,1,LpInteger)
     
     
     
