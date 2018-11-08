@@ -226,12 +226,12 @@ for i,model in enumerate(models):
 fig.show()
 
 # ============================== # 
-# ===== model assembly  ======== # 
+# ===== model ensemble  ======== # 
 # ============================== # 
 
-# Model assembly based on score performance and convexity conditions over the 
+# Model ensemble  based on score performance and convexity conditions over the 
 # model curve
-class AssembleModel():
+class EnsembleModel():
     
     def __init__(self, models):
         selected_models = []
@@ -249,7 +249,7 @@ class AssembleModel():
                 /sum([mdl['score'] for mdl in self.selected_models])
         
 
-best_model = AssembleModel(models)
+best_model = EnsembleModel(models)
 best_model.predict(x_matrix)
 
 # export model 
@@ -262,18 +262,87 @@ with open("best_model.pkl", "wb") as dill_file:
 # ========= optimization model ========== #
 # ======================================= #
 
+# lineal model version 
+# create value matrix
+"""
+inv_vectors={} 
+density = 10
+for inv_col in inv_columns:
+    inv_vectors[inv_col] =  np.linspace(start = data_sel_col[inv_col].mean()*0.80,  # rango de optimización
+                                    stop = data_sel_col[inv_col].max()*1.20,   # rango de optimización
+                                    num = density,
+                                    dtype = int)
+ 
+inv_combinations = np.array(np.meshgrid(*[vector for vector in inv_vectors.values()]) ).T.reshape(-1, len(inv_vectors))    
 
-from pulp import LpProblem, LpMaximize, LpVariable
+predict = pd.DataFrame(np.repeat(data_sel_col.iloc[-1:].values, len(inv_combinations) ,axis=0), 
+                       columns = data_sel_col.columns)    
+
+predict[inv_columns] = inv_combinations
+
+f_values= pd.DataFrame(inv_combinations,columns= inv_columns)
+f_values['fvalue'] =  best_model.predict(predict[indep_vars].values)
+f_values['tuple_idx'] = f_values[inv_columns].apply(tuple, axis=1)
+"""
+
+
+# ============================= #
+# ======== lineal model ======= #
+# ============================= #
+"""
+from pulp import LpProblem, LpMaximize, LpVariable, LpInteger, lpSum
 
 # problem definition 
 prob = LpProblem("MMM",LpMaximize)
-opt_vars = {}
-# matrix f(x)
-for inv_var in inv_columns:
-    pass
-    #opt_vars[inv_var] = LpVariable(inv_var, lowBound = 0)
 
-#choices = LpVariable.dicts("Choice",(Vals,Rows,Cols),0,1,LpInteger)
-    
-    
-    
+inv_vars = LpVariable.dicts("investment_",list(map(tuple,inv_combinations)),
+                               0,
+                               1,
+                               LpInteger)
+
+#objetive function
+prob += lpSum([ inv_vars[i]* f_values.loc[(f_values['tuple_idx'] == i)].fvalue for i in inv_vars.keys()])
+"""
+# ================================= #
+# ======== non lineal model ======= #
+# ================================= #
+
+from scipy.optimize import minimize
+
+def sale(array):
+    predict = pd.DataFrame(np.repeat(data_sel_col.iloc[-1:].values, 1 ,axis=0), 
+                           columns = data_sel_col.columns)    
+
+    predict[inv_columns] = array
+    return -1 * best_model.predict(predict[indep_vars].values) # -sales(x)
+
+# constraints
+K =  20 # weeks
+inv_promedio = data_sel_col.iloc[-K:][inv_columns].mean().values
+TOTAL_BUGET =  sum(inv_promedio)
+
+def buget_constraint(array):
+    return sum(array) - TOTAL_BUGET
+cons = [{'type':'eq', 'fun': buget_constraint}]
+
+x = minimize(sale, 
+             data_sel_col.iloc[-K:][inv_columns].mean().values,
+             method ='SLSQP',
+             bounds=[(data_sel_col.iloc[-K:][inv_col].mean()*0.80, 
+                      data_sel_col.iloc[-K:][inv_col].max()*1.20) for inv_col in inv_columns ],
+            options={'ftol':1e-10,
+                      'maxiter':100
+                     },
+            constraints=cons
+            )
+
+
+inv_propuesta = x.x
+# percentajes solver
+print((inv_propuesta-inv_promedio)/inv_promedio)
+mean_proportion = inv_promedio / sum(inv_promedio)
+prop_proportion = inv_propuesta / sum(inv_propuesta)
+
+for i,inv_var in enumerate(inv_columns):
+    print("solver solution")
+    print ('{0}  actual={1:3f} , prop={2:3f}'.format(*[inv_var,mean_proportion[i],prop_proportion[i] ])  )
